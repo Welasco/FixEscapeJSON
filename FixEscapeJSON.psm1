@@ -108,6 +108,45 @@ function FixJSONMultiThread {
 }
 
 function Invoke-FixJSON {
+    <# 
+    .Synopsis
+    Invoke-FixJSON
+    This PowerShell command'let will Fix a JSON file that doesn't have escape characters behind a special characters.
+
+    .Description
+    Invoke-FixJSON
+    This PowerShell command'let will Fix a JSON file that doesn't have escape characters behind a special characters.
+    Here is the list with all JSON special characters that must be escaped:
+
+        %x22 /          ; "    quotation mark  U+0022
+        %x5C /          ; \    reverse solidus U+005C
+        %x2F /          ; /    solidus         U+002F
+        %x62 /          ; b    backspace       U+0008
+        %x66 /          ; f    form feed       U+000C
+        %x6E /          ; n    line feed       U+000A
+        %x72 /          ; r    carriage return U+000D
+        %x74 /          ; t    tab             U+0009
+        %x75 4HEXDIG )  ; uXXXX  U+XXXX   
+
+    .Example
+    # Fixing all JSON files in a folder
+    If you have more than one file in a folder the command will simultaneously (Multithreading) process 4 files by default.
+    Invoke-FixJSON -Folder C:\JsonFiles
+
+    .Example
+    # Fixing all JSON files in a folder specifing how many files you would like to simultaneously process (Multithreading)
+    By default it will process 4 files simultaneously (Multithreading)
+    Invoke-FixJSON -Folder C:\JsonFiles -Threads 2
+    Invoke-FixJSON -Folder C:\JsonFiles -Threads 6
+
+    .Example
+    # Fixing a single JSON file
+    Invoke-FixJSON -File C:\JsonFiles\jsonfile.json
+
+    # A URL to the main website for this project.
+    ProjectUri = 'https://github.com/welasco/FixEscapeJSON'
+    Resource = https://tools.ietf.org/html/rfc7159
+    #>      
     [CmdletBinding(DefaultParameterSetName='FolderorFile')]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Folder')]
