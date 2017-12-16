@@ -52,7 +52,7 @@ function FixJSONMultiThread {
                 $exception = $Error[0]
                 $line = (($exception -split("line "))[1] -split(","))[0] - 1
                 $position = ((($exception -split("line "))[1] -split(","))[1] -split(" "))[2]
-                $position = ((($exception -split("line "))[1] -split(","))[1] -split(" "))[2].Substring(0,$position.Length-2) - 2
+                $position = ((($exception -split("line "))[1] -split(","))[1] -split(" "))[2].Substring(0,$position.Length-2) - 1
                 $content[$line] = $content[$line].Insert($position,"\")
             }
         }while($Error.count -ne 0)
