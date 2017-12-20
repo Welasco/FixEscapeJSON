@@ -34,6 +34,7 @@ function FixJSONMultiThread {
     $ScriptBlock = {
         param(
             [string]$Path,
+            [string]$JobName,
             [string]$NewtonsoftDllPath
         )
         # Loading Newtonsoft.Json library *** You may need to change the file Path
@@ -41,10 +42,22 @@ function FixJSONMultiThread {
     
         $filepath = $Path
         $content = Get-Content $filepath
+
+        $Progress = 100 / $content.Length
+        $ProgressCount = 100 / $content.Length
+
         # Do loop that will be executed until the whole file is fixed.
         do{
+            $PerComplete = "{0:0}" -f $Progress
+            $CurrentOperation = ("Processing line "+ $line +" of "+ $content.Length + " lines.")
+            #Write-Progress -Activity "Processing Job: $JobName" -Status "$PerComplete% Complete" -CurrentOperation $CurrentOperation -PercentComplete $Progress
+            Write-Progress -Activity "Processing Job: $JobName" -Status "$PerComplete% Complete" -CurrentOperation $CurrentOperation -PercentComplete ($line/$content.Length*100)
             $file = $content | Out-String
             try{
+                #if ($previousline -ne $line) {
+                    $Progress = $Progress + $ProgressCount
+                #}
+                $previousline = $line
                 $error.Clear()
                 $test = [Newtonsoft.Json.JsonConvert]::DeserializeObject($file)
             }
@@ -56,6 +69,9 @@ function FixJSONMultiThread {
                 $content[$line] = $content[$line].Insert($position,"\")
             }
         }while($Error.count -ne 0)
+        $Progress=100 
+        $PerComplete=100 
+        Write-Progress -Activity "Processing Job: $JobName" -Status "$PerComplete% Complete:" -PercentComplete $Progress
         $content | Set-Content $filepath
     }    
 
@@ -72,33 +88,56 @@ function FixJSONMultiThread {
     }
 
 
-    # Progress Control
-    $Progress = 100 / $childFiles.Count
-    $ProgressCount = 100 / $childFiles.Count
-
     # Looping all Json log files in the folder $folderPath
     Foreach($childfile in $childFiles){
-
 
         # Do loop to control how many threads will be executing simultaneously
         Do
         {
-            $Job = (Get-Job -State Running | Measure-Object).count
+            $RunningJobs = Get-Job -State Running
+            $Job = ($RunningJobs | Measure-Object).count
+
+            foreach($RunningJob in $RunningJobs){
+                $JobProgress = $RunningJob.ChildJobs[0].Progress[$RunningJob.ChildJobs[0].Progress.Count-1].PercentComplete
+                $CurrentOperation = $RunningJob.ChildJobs[0].Progress[$RunningJob.ChildJobs[0].Progress.Count-1].CurrentOperation
+                $RunningJobName = $RunningJob.Name
+                if($JobProgress -ge 0){
+                    Write-Progress -Id $RunningJob.Id -Activity "Processing file: $RunningJobName" -Status "$JobProgress% Complete:" -CurrentOperation $CurrentOperation -PercentComplete $JobProgress
+                    if($JobProgress -eq 100){
+                        Write-Progress -Id $RunningJob.Id -Activity "Processing file: $RunningJobName" -Status "Completed" -Completed
+                    }
+                }
+            }            
+
             Start-Sleep -Seconds 1
 
         } Until ($Job -lt $Jobs)
 
-        #Writing Progress
-        $PerComplete = "{0:0}" -f $Progress
-        write-progress -activity "Processing file: $childfile" -status "$PerComplete% Complete:" -percentcomplete $Progress
-
         # Creating a new Thread
-        Start-Job -Name $childfile.Name -ScriptBlock $ScriptBlock -ArgumentList $childfile.FullName,$NewtonsoftDllPath | Out-Null
+        Start-Job -Name $childfile.Name -ScriptBlock $ScriptBlock -ArgumentList $childfile.FullName,$childfile.Name,$NewtonsoftDllPath | Out-Null
         # Removing all fineshed Threads
         Get-Job -State Completed | Remove-Job
-        # Incrementing Progress 
-        $Progress = $Progress + $ProgressCount
     }
+
+    Do
+    {
+        $RunningJobs = Get-Job -State Running
+        $Job = ($RunningJobs | Measure-Object).count
+    
+        foreach($RunningJob in $RunningJobs){
+            $JobProgress = $RunningJob.ChildJobs[0].Progress[$RunningJob.ChildJobs[0].Progress.Count-1].PercentComplete
+            $CurrentOperation = $RunningJob.ChildJobs[0].Progress[$RunningJob.ChildJobs[0].Progress.Count-1].CurrentOperation
+            $RunningJobName = $RunningJob.Name
+            if($JobProgress -ge 0){
+                Write-Progress -Id $RunningJob.Id -Activity "Processing file: $RunningJobName" -Status "$JobProgress% Complete:" -CurrentOperation $CurrentOperation -PercentComplete $JobProgress
+                if($JobProgress -eq 100){
+                    Write-Progress -Id $RunningJob.Id -Activity "Processing file: $RunningJobName" -Status "Completed" -Completed
+                }
+            }
+        }            
+        Start-Sleep -Seconds 1
+    } Until ((Get-Job -State Running).count -eq 0)
+
 
     # Cleaning steps
     Wait-Job -State Running | Out-Null
